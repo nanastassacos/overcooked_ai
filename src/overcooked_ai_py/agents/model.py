@@ -5,6 +5,7 @@ import torch
 import random
 from distutils.command.config import config
 from torch import nn
+import torch.nn.functional as F
 from torch.distributions import Normal, Categorical
 from collections import defaultdict, namedtuple, deque
 from overcooked_ai_py.mdp.actions import Action
@@ -84,30 +85,71 @@ class Critic(BaseNetwork):
 class Actor(BaseNetwork):
     def __init__(self, params):
         BaseNetwork.__init__(self, params)
-        self.output_activation = nn.LogSoftmax(dim=1)
+        self.output_activation = nn.Softmax(dim=1)
         self.net = create_linear_network(self.input_dim, self.output_dim, self.hidden_dims, output_activation=self.output_activation)
 
     def forward(self, states):
-        log_probs = self.net(states)
-        probs = torch.exp(log_probs)
-        max_prob_action = torch.argmax(probs, dim=-1)
-        action_dist = Categorical(probs)
-        action = action_dist.sample()
+        probs = self.net(states)
+        z = probs == 0.0
+        z = z.float() * 1e-8
+        log_probs = torch.log(probs + z)
 
-        return action_dist, log_probs, action, max_prob_action
+        return probs, log_probs
         
-
+def copy_model_over(from_model, to_model):
+    """Copies model parameters from from_model to to_model"""
+    for to_model, from_model in zip(to_model.parameters(), from_model.parameters()):
+        to_model.data.copy_(from_model.data.clone())
+        
+        
 class SAC(object):
     def __init__(self, config):
         self.config = config
         
         self.actor = Actor(self.config.params)
-        self.critic1 = Critic(self.config.params)
-        self.critic2 = Critic(self.config.params)
-        
+
+        self.critic_1 = Critic(self.config.params)
+        self.critic_2 = Critic(self.config.params)
+
+        self.critic_target_1 = Critic(self.config.params)
+        self.critic_target_2 = Critic(self.config.params)
+
+        copy_model_over(self.critic_1, self.critic_target_1)
+        copy_model_over(self.critic_2, self.critic_target_2)
+
         self.memory = ReplayMemory(maxlen=1e5)
 
     def save_experience(self, mdp_tuple):
         self.memory.push(mdp_tuple)
 
-    
+    def calculate_critic_loss(self, states, actions, rewards, mask):
+        with torch.no_grad():
+            _, probs, log_probs = self.actor(states)
+            qf1_next_target = self.critic_target(states)
+            qf2_next_target = self.critic_target_2(states)
+            min_qf_next_target = probs * (torch.min(qf1_next_target, qf2_next_target) - self.alpha * log_probs)
+            min_qf_next_target = min_qf_next_target.sum(dim=1).unsqueeze(-1)
+            next_q_value = rewards + (1.0 - mask) * self.config.params["discount_rate"] * (min_qf_next_target)
+
+        qf1 = self.critic_1(states).gather(1, actions.long())
+        qf2 = self.critic_2(states).gather(1, actions.long())
+
+        qf1_loss = F.mse_loss(qf1, next_q_value)
+        qf2_loss = F.mse_loss(qf2, next_q_value)
+
+        return qf1_loss, qf2_loss
+
+    def calculate_actor_loss(self, states):
+        
+        _, probs, log_probs = self.actor(states)
+        qf1_pi = self.critic_1(states)
+        qf2_pi = self.critic_2(states)
+        min_qf_pi = torch.min(qf1_pi, qf2_pi)
+        inside_term = self.alpha * log_probs - min_qf_pi
+        policy_loss = (probs * inside_term).sum(dim=1).mean()
+        log_probs = torch.sum(log_probs * probs, dim=1)
+
+        return policy_loss, log_probs
+
+    def train(self):
+        pass
