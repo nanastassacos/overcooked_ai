@@ -1,5 +1,6 @@
 import itertools, math
 import numpy as np
+import torch
 from collections import defaultdict
 from overcooked_ai_py.mdp.actions import Action
 
@@ -119,24 +120,27 @@ class AgentPair(AgentGroup):
         else:
             return super().joint_action(state)
 
+
 class NNPolicy(object):
     """
     This is a common format for NN-based policies. Once one has wrangled the intended trained neural net
     to this format, one can then easily create an Agent with the AgentFromPolicy class.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, model):
+        self.model = model
 
     def multi_state_policy(self, states, agent_indices):
         """
         A function that takes in multiple OvercookedState instances and their respective agent indices and returns action probabilities.
         """
-        raise NotImplementedError()
+        action_dist, log_probs, action, max_prob_action =  states[agent_indices]
+
+        return action_dist
 
     def multi_obs_policy(self, states):
         """
-        A function that takes in multiple preprocessed OvercookedState instatences and returns action probabilities.
+        A function that takes in multiple preprocessed OvercookedState instances and returns action probabilities.
         """
         raise NotImplementedError()
 
@@ -472,6 +476,7 @@ class SampleAgent(Agent):
         return Action.sample(action_probs), {"action_probs": action_probs}
     """
     """
+
 # Deprecated. Need to fix Heuristic to work with the new MDP to reactivate Planning
 # class CoupledPlanningAgent(Agent):
 #     """
