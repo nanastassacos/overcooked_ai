@@ -45,17 +45,18 @@ def create_conv_network(output_dim, hidden_dims=[],
 
     layers = [
         # Defining a 2D convolution layer
-        nn.Conv2d(1, 4, kernel_size=3, stride=1, padding=1),
-        nn.BatchNorm2d(4),
+        nn.Conv2d(10, 32, kernel_size=3, stride=1, padding=1),
+        nn.BatchNorm2d(32),
         nn.ReLU(inplace=True),
         nn.MaxPool2d(kernel_size=2, stride=2),
         # Defining another 2D convolution layer
-        nn.Conv2d(4, 4, kernel_size=3, stride=1, padding=1),
-        nn.BatchNorm2d(4),
+        nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+        nn.BatchNorm2d(64),
         nn.ReLU(inplace=True),
         nn.MaxPool2d(kernel_size=2, stride=2),
     ]
-    units = 4 * 7 * 7
+    units = 64*6
+    
     for next_units in hidden_dims:
         layers.append(nn.Linear(units, next_units))
         layers.append(hidden_activation)

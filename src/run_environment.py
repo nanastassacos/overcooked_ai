@@ -42,7 +42,6 @@ def run_environment(config):
     a0 = GreedyHumanModel(mlam)
     a1 = AgentFromPolicy(policy)
 
-    agent_pair = AgentPair(a0, a1)
     start_state = OvercookedState(
         [P((8, 1), s),
             P((1, 1), s)],
@@ -57,14 +56,15 @@ def run_environment(config):
 
         state = env.lossless_state_encoding_mdp(env.state)
         print(state[0])
-        print(state[1])
-        action = a1.action(torch.Tensor(state[0]))
-        print(action)
+        print(state[1].shape)
 
-        action1 = Action.ALL_ACTIONS[0]
-        action2 = Action.ALL_ACTIONS[1]
+        # action0 = a0.action(env.state)
+        action1 = a1.action(torch.Tensor(state[1][None, :]))
 
-        s_tp1, r_t, done, info = env.step([action1, action2])
+        # action0 = Action.ALL_ACTIONS[0]
+        # action1 = Action.ALL_ACTIONS[1]
+
+        # s_tp1, r_t, done, info = env.step([action0, action1])
 
         done = True
 
