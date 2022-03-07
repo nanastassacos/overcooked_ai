@@ -134,6 +134,8 @@ class NNPolicy(object):
         """
         A function that takes in multiple OvercookedState instances and their respective agent indices and returns action probabilities.
         """
+        print(states)
+        print(agent_indices)
         action_dist, log_probs, action, max_prob_action =  states[agent_indices]
 
         return action_dist

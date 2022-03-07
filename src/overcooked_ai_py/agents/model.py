@@ -45,7 +45,8 @@ Transition = namedtuple('Transition',
 class ReplayMemory(object):
 
     def __init__(self, capacity):
-        self.memory = deque([],maxlen=capacity)
+        print(capacity)
+        self.memory = deque([], maxlen=capacity)
 
     def push(self, *args):
         """Save a transition"""
@@ -61,11 +62,12 @@ class ReplayMemory(object):
 class BaseNetwork(nn.Module):
 
     def __init__(self, params):
+        super(BaseNetwork, self).__init__()
         self.params = params
-        self.lr = params.lr
-        self.hidden_dims = params.hidden_dims
-        self.input_dim = params.input_dim
-        self.output_dim = params.output_dims
+        self.lr = params["lr"]
+        self.hidden_dims = params["hidden_dims"]
+        self.input_dim = params["input_dim"]
+        self.output_dim = params["output_dim"]
 
     def save(self, path):
         torch.save(self.state_dict(), path)
@@ -75,7 +77,8 @@ class BaseNetwork(nn.Module):
 
 class Critic(BaseNetwork):
     def __init__(self, params):
-        BaseNetwork.__init__(self, params)
+        super(Critic, self).__init__(params)
+        self.net = create_linear_network(self.input_dim, self.output_dim, self.hidden_dims, output_activation=None)
 
     def forward(self, states):
         q_values = self.net(states)
@@ -84,9 +87,9 @@ class Critic(BaseNetwork):
 
 class Actor(BaseNetwork):
     def __init__(self, params):
-        BaseNetwork.__init__(self, params)
-        self.output_activation = nn.Softmax(dim=1)
-        self.net = create_linear_network(self.input_dim, self.output_dim, self.hidden_dims, output_activation=self.output_activation)
+        super(Actor, self).__init__(params)
+        output_activation = nn.Softmax(dim=1)
+        self.net = create_linear_network(self.input_dim, self.output_dim, self.hidden_dims, output_activation=output_activation)
 
     def forward(self, states):
         probs = self.net(states)
@@ -106,18 +109,18 @@ class SAC(object):
     def __init__(self, config):
         self.config = config
         
-        self.actor = Actor(self.config.params)
+        self.actor = Actor(self.config["params"])
 
-        self.critic_1 = Critic(self.config.params)
-        self.critic_2 = Critic(self.config.params)
+        self.critic_1 = Critic(self.config["params"])
+        self.critic_2 = Critic(self.config["params"])
 
-        self.critic_target_1 = Critic(self.config.params)
-        self.critic_target_2 = Critic(self.config.params)
+        self.critic_target_1 = Critic(self.config["params"])
+        self.critic_target_2 = Critic(self.config["params"])
 
         copy_model_over(self.critic_1, self.critic_target_1)
         copy_model_over(self.critic_2, self.critic_target_2)
 
-        self.memory = ReplayMemory(maxlen=1e5)
+        self.memory = ReplayMemory(capacity=10000)
 
     def save_experience(self, mdp_tuple):
         self.memory.push(mdp_tuple)
