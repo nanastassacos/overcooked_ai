@@ -38,6 +38,36 @@ def create_linear_network(input_dim, output_dim, hidden_dims=[],
     return nn.Sequential(*layers).apply(initialize_weights_xavier)
 
 
+def create_conv_network(output_dim, hidden_dims=[],
+                          hidden_activation=nn.ReLU(), output_activation=None,
+                          initializer=initialize_weights_xavier):
+
+
+    layers = [
+        # Defining a 2D convolution layer
+        nn.Conv2d(1, 4, kernel_size=3, stride=1, padding=1),
+        nn.BatchNorm2d(4),
+        nn.ReLU(inplace=True),
+        nn.MaxPool2d(kernel_size=2, stride=2),
+        # Defining another 2D convolution layer
+        nn.Conv2d(4, 4, kernel_size=3, stride=1, padding=1),
+        nn.BatchNorm2d(4),
+        nn.ReLU(inplace=True),
+        nn.MaxPool2d(kernel_size=2, stride=2),
+    ]
+    units = 4 * 7 * 7
+    for next_units in hidden_dims:
+        layers.append(nn.Linear(units, next_units))
+        layers.append(hidden_activation)
+        units = next_units
+
+    layers.append(nn.Linear(units, output_dim))
+    if output_activation is not None:
+        layers.append(output_activation)
+
+    return nn.Sequential(*layers).apply(initialize_weights_xavier)
+
+
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
 
@@ -78,7 +108,7 @@ class BaseNetwork(nn.Module):
 class Critic(BaseNetwork):
     def __init__(self, params):
         super(Critic, self).__init__(params)
-        self.net = create_linear_network(self.input_dim, self.output_dim, self.hidden_dims, output_activation=None)
+        self.net = create_conv_network(self.output_dim, self.hidden_dims, output_activation=None)
 
     def forward(self, states):
         q_values = self.net(states)
@@ -89,7 +119,7 @@ class Actor(BaseNetwork):
     def __init__(self, params):
         super(Actor, self).__init__(params)
         output_activation = nn.Softmax(dim=1)
-        self.net = create_linear_network(self.input_dim, self.output_dim, self.hidden_dims, output_activation=output_activation)
+        self.net = create_conv_network(self.output_dim, self.hidden_dims, output_activation=output_activation)
 
     def forward(self, states):
         probs = self.net(states)

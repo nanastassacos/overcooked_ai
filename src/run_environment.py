@@ -50,7 +50,22 @@ def run_environment(config):
         all_orders=scenario_2_mdp.start_all_orders
     )
     env = OvercookedEnv.from_mdp(scenario_2_mdp, start_state_fn=lambda: start_state, horizon=100)
-    trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
 
+    done = False    
+    while not done:
+        # action must be given as (0, 1)
+
+        state = env.lossless_state_encoding_mdp(env.state)
+        print(state[0])
+        print(state[1])
+        action = a1.action(torch.Tensor(state[0]))
+        print(action)
+
+        action1 = Action.ALL_ACTIONS[0]
+        action2 = Action.ALL_ACTIONS[1]
+
+        s_tp1, r_t, done, info = env.step([action1, action2])
+
+        done = True
 
 run_environment(config)

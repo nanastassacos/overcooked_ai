@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from collections import defaultdict
 from overcooked_ai_py.mdp.actions import Action
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
 
 
 class Agent(object):
@@ -134,10 +135,10 @@ class NNPolicy(object):
         """
         A function that takes in multiple OvercookedState instances and their respective agent indices and returns action probabilities.
         """
-        print(states)
-        print(agent_indices)
-        action_dist, log_probs, action, max_prob_action =  states[agent_indices]
-
+        
+        for state, agent_idx in zip(states, agent_indices):
+            action_dist, log_probs, action, max_prob_action = self.model.actor(state)
+            
         return action_dist
 
     def multi_obs_policy(self, states):
