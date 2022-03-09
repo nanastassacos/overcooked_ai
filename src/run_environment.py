@@ -55,8 +55,6 @@ def run_environment(config):
         # action must be given as (0, 1)
 
         state = env.lossless_state_encoding_mdp(env.state)
-        print(state[0])
-        print(state[1].shape)
 
         # action0 = a0.action(env.state)
         action1 = a1.action(torch.Tensor(state[1][None, :]))

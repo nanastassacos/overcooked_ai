@@ -137,9 +137,9 @@ class NNPolicy(object):
         """
         
         for state, agent_idx in zip(states, agent_indices):
-            action_dist, log_probs, action, max_prob_action = self.model.actor(state)
-            
-        return action_dist
+            action_dist, log_probs, = self.model.actor(state)
+
+        return action_dist.detach().numpy()
 
     def multi_obs_policy(self, states):
         """
