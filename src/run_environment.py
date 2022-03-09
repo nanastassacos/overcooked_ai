@@ -29,18 +29,22 @@ DISPLAY = False
 
 simple_mdp = OvercookedGridworld.from_layout_name('cramped_room')
 large_mdp = OvercookedGridworld.from_layout_name('corridor')
+scenario_2_mdp = OvercookedGridworld.from_layout_name('scenario2')
 
 with open('overcooked_ai_py/agents/config.json', 'r') as JSON:
     config = json.load(JSON)
 
 def run_environment(config):
-    model = SAC(config=config)
-    policy = NNPolicy(model)
+    model0 = SAC(config=config)
+    model1 = SAC(config=config)
+    
+    policy0 = NNPolicy(model0)
+    policy1 = NNPolicy(model1)
 
-    scenario_2_mdp = OvercookedGridworld.from_layout_name('scenario2')
-    mlam = MediumLevelActionManager.from_pickle_or_compute(scenario_2_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)
-    a0 = GreedyHumanModel(mlam)
-    a1 = AgentFromPolicy(policy)
+    # mlam = MediumLevelActionManager.from_pickle_or_compute(scenario_2_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)
+    # a0 = GreedyHumanModel(mlam)
+    a0 = AgentFromPolicy(policy0)
+    a1 = AgentFromPolicy(policy1)
 
     start_state = OvercookedState(
         [P((8, 1), s),
@@ -48,7 +52,7 @@ def run_environment(config):
         {},
         all_orders=scenario_2_mdp.start_all_orders
     )
-    env = OvercookedEnv.from_mdp(scenario_2_mdp, start_state_fn=lambda: start_state, horizon=100)
+    env = OvercookedEnv.from_mdp(scenario_2_mdp, start_state_fn=lambda: start_state, horizon=10)
 
     done = False    
     while not done:
@@ -56,14 +60,15 @@ def run_environment(config):
 
         state = env.lossless_state_encoding_mdp(env.state)
 
-        # action0 = a0.action(env.state)
+        action0 = a0.action(torch.Tensor(state[0][None, :]))
         action1 = a1.action(torch.Tensor(state[1][None, :]))
 
         # action0 = Action.ALL_ACTIONS[0]
         # action1 = Action.ALL_ACTIONS[1]
-
-        # s_tp1, r_t, done, info = env.step([action0, action1])
-
-        done = True
+        print("Actions:")
+        print(action0)
+        print(action1)
+        s_tp1, r_t, done, info = env.step([action0, action1])
+        print('')
 
 run_environment(config)
