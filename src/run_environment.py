@@ -60,11 +60,10 @@ def run_environment(config):
 
         state = env.lossless_state_encoding_mdp(env.state)
 
-        action0 = a0.action(torch.Tensor(state[0][None, :]))
-        action1 = a1.action(torch.Tensor(state[1][None, :]))
+        action0 = a0.action(torch.Tensor(state[0][None, :]))[0]
+        print(action0)
+        action1 = a1.action(torch.Tensor(state[1][None, :]))[0]
 
-        # action0 = Action.ALL_ACTIONS[0]
-        # action1 = Action.ALL_ACTIONS[1]
         print("Actions:")
         print(action0)
         print(action1)
