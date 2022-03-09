@@ -128,7 +128,8 @@ class NNPolicy(object):
     to this format, one can then easily create an Agent with the AgentFromPolicy class.
     """
 
-    def __init__(self, model):
+    def __init__(self, env, model):
+        self.env = env
         self.model = model
 
     def multi_state_policy(self, states, agent_indices):
@@ -137,6 +138,8 @@ class NNPolicy(object):
         """
         
         for state, agent_idx in zip(states, agent_indices):
+            state = self.env.lossless_state_encoding_mdp(state)
+            state = torch.Tensor(state[agent_idx][None, :])
             action_dist, log_probs, = self.model.actor(state)
 
         return action_dist.detach().numpy()
@@ -164,6 +167,7 @@ class AgentFromPolicy(Agent):
         return self.actions([state], [self.agent_index])[0]
 
     def actions(self, states, agent_indices):
+
         action_probs_n = self.policy.multi_state_policy(states, agent_indices)
         actions_and_infos_n = []
         for action_probs in action_probs_n:

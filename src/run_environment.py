@@ -35,16 +35,6 @@ with open('overcooked_ai_py/agents/config.json', 'r') as JSON:
     config = json.load(JSON)
 
 def run_environment(config):
-    model0 = SAC(config=config)
-    model1 = SAC(config=config)
-    
-    policy0 = NNPolicy(model0)
-    policy1 = NNPolicy(model1)
-
-    # mlam = MediumLevelActionManager.from_pickle_or_compute(scenario_2_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)
-    # a0 = GreedyHumanModel(mlam)
-    a0 = AgentFromPolicy(policy0)
-    a1 = AgentFromPolicy(policy1)
 
     start_state = OvercookedState(
         [P((8, 1), s),
@@ -52,22 +42,25 @@ def run_environment(config):
         {},
         all_orders=scenario_2_mdp.start_all_orders
     )
+
     env = OvercookedEnv.from_mdp(scenario_2_mdp, start_state_fn=lambda: start_state, horizon=10)
+    env.reset()
+    
+    model0 = SAC(config=config)
+    model1 = SAC(config=config)
+    
+    policy0 = NNPolicy(env, model0)
+    policy1 = NNPolicy(env, model1)
+
+
+    a0 = AgentFromPolicy(policy0)
+    a1 = AgentFromPolicy(policy1)
 
     done = False    
     while not done:
-        # action must be given as (0, 1)
 
-        state = env.lossless_state_encoding_mdp(env.state)
+        agent_pair = AgentPair(a0, a1)
+        env.run_agents(agent_pair)
 
-        action0 = a0.action(torch.Tensor(state[0][None, :]))[0]
-        print(action0)
-        action1 = a1.action(torch.Tensor(state[1][None, :]))[0]
-
-        print("Actions:")
-        print(action0)
-        print(action1)
-        s_tp1, r_t, done, info = env.step([action0, action1])
-        print('')
 
 run_environment(config)
