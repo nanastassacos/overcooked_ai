@@ -71,7 +71,7 @@ def create_conv_network(output_dim, hidden_dims=[],
 
 
 Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
+                        ('state', 'action', 'reward', 'next_state', 'done'))
 
 
 class ReplayMemory(object):
@@ -153,8 +153,8 @@ class SAC(object):
 
         self.memory = ReplayMemory(capacity=10000)
 
-    def save_experience(self, mdp_tuple):
-        self.memory.push(mdp_tuple)
+    def save_experience(self, state, action, reward, next_state, done):
+        self.memory.push(state, action, reward, next_state, done)
 
     def calculate_critic_loss(self, states, actions, rewards, mask):
         with torch.no_grad():
