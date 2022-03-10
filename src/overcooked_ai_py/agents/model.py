@@ -71,7 +71,7 @@ def create_conv_network(output_dim, hidden_dims=[],
 
 
 Transition = namedtuple('Transition',
-                        ('state', 'action', 'reward', 'next_state', 'done'))
+                        ('state', 'action', 'reward', 'done'))
 
 
 class ReplayMemory(object):
@@ -79,7 +79,7 @@ class ReplayMemory(object):
     def __init__(self, capacity):
         self.memory = deque([], maxlen=capacity)
 
-    def push(self, *args):
+    def push(self, args):
         """Save a transition"""
         self.memory.append(Transition(*args))
 
@@ -139,51 +139,101 @@ def copy_model_over(from_model, to_model):
 class SAC(object):
     def __init__(self, config):
         self.config = config
-        
-        self.actor = Actor(self.config["params"])
+        self.hyperparameters = config["hyperparameters"]
+        self.alpha = self.hyperparameters["alpha"]
 
-        self.critic_1 = Critic(self.config["params"])
-        self.critic_2 = Critic(self.config["params"])
+        self.actor = Actor(self.hyperparameters["Actor"])
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(),
+                                          lr=self.hyperparameters["Actor"]["lr"], eps=self.hyperparameters["eps"])
 
-        self.critic_target_1 = Critic(self.config["params"])
-        self.critic_target_2 = Critic(self.config["params"])
+        self.critic_0 = Critic(self.hyperparameters["Critic"])
+        self.critic_1 = Critic(self.hyperparameters["Critic"])
+        self.critic_optimizer_0 = torch.optim.Adam(self.critic_0.parameters(),
+                                                 lr=self.hyperparameters["Critic"]["lr"], eps=1e-4)
+        self.critic_optimizer_1 = torch.optim.Adam(self.critic_1.parameters(),
+                                                   lr=self.hyperparameters["Critic"]["lr"], eps=1e-4)
 
+        self.critic_target_0 = Critic(self.hyperparameters["Critic"])
+        self.critic_target_1 = Critic(self.hyperparameters["Critic"])
+
+        copy_model_over(self.critic_0, self.critic_target_0)
         copy_model_over(self.critic_1, self.critic_target_1)
-        copy_model_over(self.critic_2, self.critic_target_2)
 
         self.memory = ReplayMemory(capacity=10000)
 
-    def save_experience(self, state, action, reward, next_state, done):
-        self.memory.push(state, action, reward, next_state, done)
+    def save_experience(self, state, action, reward, done):
+        self.memory.push((state, action, reward, done))
 
     def calculate_critic_loss(self, states, actions, rewards, mask):
         with torch.no_grad():
-            _, probs, log_probs = self.actor(states)
-            qf1_next_target = self.critic_target(states)
-            qf2_next_target = self.critic_target_2(states)
-            min_qf_next_target = probs * (torch.min(qf1_next_target, qf2_next_target) - self.alpha * log_probs)
+            probs, log_probs = self.actor(states)
+            qf0_next_target = self.critic_target_0(states)
+            qf1_next_target = self.critic_target_1(states)
+
+            min_qf_next_target = probs * (torch.min(qf0_next_target, qf1_next_target) - self.alpha * log_probs)
             min_qf_next_target = min_qf_next_target.sum(dim=1).unsqueeze(-1)
-            next_q_value = rewards + (1.0 - mask) * self.config.params["discount_rate"] * (min_qf_next_target)
 
-        qf1 = self.critic_1(states).gather(1, actions.long())
-        qf2 = self.critic_2(states).gather(1, actions.long())
+            next_q_value = rewards + (1.0 - mask) * self.hyperparameters["discount_rate"] * (min_qf_next_target).view(-1)
 
+        qf0 = self.critic_0(states)[torch.arange(len(actions)), actions]
+        qf1 = self.critic_1(states)[torch.arange(len(actions)), actions]
+
+        qf0_loss = F.mse_loss(qf0, next_q_value)
         qf1_loss = F.mse_loss(qf1, next_q_value)
-        qf2_loss = F.mse_loss(qf2, next_q_value)
 
-        return qf1_loss, qf2_loss
+        return qf0_loss, qf1_loss
 
     def calculate_actor_loss(self, states):
         
-        _, probs, log_probs = self.actor(states)
+        probs, log_probs = self.actor(states)
+        qf0_pi = self.critic_0(states)
         qf1_pi = self.critic_1(states)
-        qf2_pi = self.critic_2(states)
-        min_qf_pi = torch.min(qf1_pi, qf2_pi)
+        min_qf_pi = torch.min(qf0_pi, qf1_pi)
         inside_term = self.alpha * log_probs - min_qf_pi
         policy_loss = (probs * inside_term).sum(dim=1).mean()
         log_probs = torch.sum(log_probs * probs, dim=1)
 
         return policy_loss, log_probs
 
+    def sample_data(self):
+        batch = self.memory.sample(batch_size=12)
+
+        states = []
+        actions = []
+        rewards = []
+        masks = []
+        for i in range(len(batch)):
+            states.append(batch[i].state)
+            actions.append(batch[i].action)
+            rewards.append(batch[i].reward)
+            masks.append(batch[i].done)
+        
+        states = torch.vstack(states)
+        actions = torch.tensor(actions)
+        rewards = torch.tensor(rewards)
+        masks = torch.tensor(masks)
+
+        return states, actions, rewards, masks
+
+    def train_critic(self, states, actions, rewards, masks):
+
+        critic_loss_0, critic_loss_1 = self.calculate_critic_loss(states, actions, rewards, masks)
+        self.critic_optimizer_0.zero_grad()
+        critic_loss_0.backward()
+        self.critic_optimizer_0.step()
+
+        self.critic_optimizer_1.zero_grad()
+        critic_loss_1.backward()
+        self.critic_optimizer_1.step()
+
+    def train_actor(self, states):
+        
+        actor_loss, _ = self.calculate_actor_loss(states)
+        self.actor_optimizer.zero_grad()
+        actor_loss.backward()
+        self.actor_optimizer.step()
+
     def train(self):
-        pass
+        states, actions, rewards, masks = self.sample_data()
+        self.train_critic(states, actions, rewards, masks)  # unsure how many times I want to train critic vs actor yet.
+        self.train_actor(states)

@@ -23,8 +23,6 @@ e, w = Direction.EAST, Direction.WEST
 stay, interact = Action.STAY, Action.INTERACT
 P, Obj = PlayerState, ObjectState
 
-force_compute_large = False
-force_compute = True
 DISPLAY = False
 
 simple_mdp = OvercookedGridworld.from_layout_name('cramped_room')
@@ -64,22 +62,19 @@ def run_environment(config):
         trajectory, timestep, sparse_reward, shaped_reward = env.run_agents(agent_pair)
         
         for i in range(len(trajectory)-1):
-            state = trajectory[i][0]
+            state = env.lossless_state_encoding_mdp(trajectory[i][0])
+            state0 = state[0]
+            state1 = state[1]
+
             action0 = Action.ACTION_TO_INDEX[trajectory[i][1][0]]
             action1 = Action.ACTION_TO_INDEX[trajectory[i][1][1]]
             reward = trajectory[i][2]
             done = trajectory[i][3]
-            if done:
-                state_ = None
-            else:
-                state_ = trajectory[i+1][0]
-            
 
-            a0.policy.model.save_experience(state, action0, reward, state_, done)
-            a1.policy.model.save_experience(state, action1, reward, state_, done)
-        
+            a0.policy.model.save_experience(torch.Tensor(state0)[None, :], action0, reward, float(done))
+            a1.policy.model.save_experience(torch.Tensor(state1)[None, :], action1, reward, float(done))
     
-    if episode_idx == episodes - 1:
-        print('Done')
+        a0.train()
+        a1.train()
 
 run_environment(config)

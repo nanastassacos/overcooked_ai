@@ -150,6 +150,9 @@ class NNPolicy(object):
         """
         raise NotImplementedError()
 
+    def train(self):
+        self.model.train()
+
 
 class AgentFromPolicy(Agent):
     """
@@ -182,6 +185,9 @@ class AgentFromPolicy(Agent):
     def reset(self):
         super(AgentFromPolicy, self).reset()
         self.policy.mdp = None
+
+    def train(self):
+        self.policy.train()
 
 class RandomAgent(Agent):
     """
