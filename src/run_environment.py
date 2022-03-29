@@ -34,7 +34,7 @@ with open('src/overcooked_ai_py/agents/config.json', 'r') as JSON:
 
 def run_environment(config):
 
-    episodes = 10
+    episodes = 1000
 
     start_state = OvercookedState(
         [P((8, 1), s),
@@ -74,6 +74,7 @@ def run_environment(config):
             a0.policy.model.save_experience(torch.Tensor(state0)[None, :], action0, reward, float(done))
             a1.policy.model.save_experience(torch.Tensor(state1)[None, :], action1, reward, float(done))
     
+        print(sparse_reward)    # k, this is zero.
         a0.train()
         a1.train()
 
